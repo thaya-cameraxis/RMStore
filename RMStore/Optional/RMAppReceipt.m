@@ -196,7 +196,7 @@ static NSURL *_appleRootCertificateURL = nil;
     return [expectedHash isEqualToData:self.receiptHash];
 }
 
-+ (RMAppReceipt*)bundleReceipt
++ (instancetype)bundleReceipt
 {
     NSURL *URL = [NSBundle mainBundle].appStoreReceiptURL;
     NSString *path = URL.path;
@@ -206,7 +206,7 @@ static NSURL *_appleRootCertificateURL = nil;
     NSData *data = [RMAppReceipt dataFromPCKS7Path:path];
     if (!data) return nil;
     
-    RMAppReceipt *receipt = [[RMAppReceipt alloc] initWithASN1Data:data];
+    id receipt = [[[self class] alloc] initWithASN1Data:data];
     return receipt;
 }
 
