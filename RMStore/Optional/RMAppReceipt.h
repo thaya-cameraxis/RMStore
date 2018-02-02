@@ -48,6 +48,10 @@ __attribute__((availability(ios,introduced=7.0)))
  */
 @property (nonatomic, strong, readonly) NSData *receiptHash;
 
+/** The date when the app receipt was created. When validating a receipt, use this date to validate the receipt’s signature.
+ */
+@property (nonatomic, strong, readonly) NSDate *creationDate;
+
 /** Array of in-app purchases contained in the receipt.
  @see RMAppReceiptIAP
  */
@@ -159,6 +163,14 @@ __attribute__((availability(ios,introduced=7.0)))
 /** The primary key for identifying subscription purchases.
  */
 @property (nonatomic, readonly) NSInteger webOrderLineItemID;
+
+/** For an auto-renewable subscription, whether or not it is in the introductory price period.
+ 
+ This key is only present for auto-renewable subscription receipts. The value for this key is "true" if the customer’s subscription is currently in an introductory price period, or "false" if not.
+ 
+ Note: If a previous subscription period in the receipt has the value “true” for either the is_trial_period or the is_in_intro_offer_period key, the user is not eligible for a free trial or introductory price within that subscription group.
+ */
+@property (nonatomic, readonly) NSInteger InIntroOfferPeriod;
 
 /** Returns an initialized in-app purchase from the given data.
  @param asn1Data ASN1 data

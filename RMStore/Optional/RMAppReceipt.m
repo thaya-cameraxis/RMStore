@@ -30,6 +30,7 @@ NSInteger const RMAppReceiptASN1TypeBundleIdentifier = 2;
 NSInteger const RMAppReceiptASN1TypeAppVersion = 3;
 NSInteger const RMAppReceiptASN1TypeOpaqueValue = 4;
 NSInteger const RMAppReceiptASN1TypeHash = 5;
+NSInteger const RMAppReceiptASN1TypeCreationDate = 12;
 NSInteger const RMAppReceiptASN1TypeInAppPurchaseReceipt = 17;
 NSInteger const RMAppReceiptASN1TypeOriginalAppVersion = 19;
 NSInteger const RMAppReceiptASN1TypeExpirationDate = 21;
@@ -43,6 +44,7 @@ NSInteger const RMAppReceiptASN1TypeOriginalPurchaseDate = 1706;
 NSInteger const RMAppReceiptASN1TypeSubscriptionExpirationDate = 1708;
 NSInteger const RMAppReceiptASN1TypeWebOrderLineItemID = 1711;
 NSInteger const RMAppReceiptASN1TypeCancellationDate = 1712;
+NSInteger const RMAppReceiptASN1TypeInIntroOfferPeriod = 1719;
 
 #pragma mark - ANS1
 
@@ -128,6 +130,12 @@ static NSURL *_appleRootCertificateURL = nil;
                     break;
                 case RMAppReceiptASN1TypeHash:
                     _receiptHash = data;
+                    break;
+                case RMAppReceiptASN1TypeCreationDate:
+                {
+                    NSString *string = RMASN1ReadIA5SString(&s, length);
+                    _creationDate = [RMAppReceipt formatRFC3339String:string];
+                }
                     break;
                 case RMAppReceiptASN1TypeInAppPurchaseReceipt:
                 {
@@ -374,6 +382,9 @@ static NSURL *_appleRootCertificateURL = nil;
                     _cancellationDate = [RMAppReceipt formatRFC3339String:string];
                     break;
                 }
+                case RMAppReceiptASN1TypeInIntroOfferPeriod:
+                    _InIntroOfferPeriod = RMASN1ReadInteger(&p, length);
+                    break;
             }
         }];
     }
