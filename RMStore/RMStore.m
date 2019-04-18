@@ -39,6 +39,8 @@ NSString* const RMSKRefreshReceiptFailed = @"RMSKRefreshReceiptFailed";
 NSString* const RMSKRefreshReceiptFinished = @"RMSKRefreshReceiptFinished";
 NSString* const RMSKRestoreTransactionsFailed = @"RMSKRestoreTransactionsFailed";
 NSString* const RMSKRestoreTransactionsFinished = @"RMSKRestoreTransactionsFinished";
+NSString* const RMStorePaymentRequstWillAddToPaymentQueue = @"RMStorePaymentRequstWillAddToPaymentQueue";
+NSString* const RMStorePaymentRequstDidStoredToProcessLater = @"RMStorePaymentRequstDidStoredToProcessLater";
 
 NSString* const RMStoreNotificationInvalidProductIdentifiers = @"invalidProductIdentifiers";
 NSString* const RMStoreNotificationDownloadProgress = @"downloadProgress";
@@ -284,6 +286,62 @@ typedef void (^RMStoreSuccessBlock)(void);
     [[SKPaymentQueue defaultQueue] restoreCompletedTransactionsWithApplicationUsername:userIdentifier];
 }
 
+#pragma mark Store payment
+
+- (BOOL)isStoredStorePaymentsAvalibleToAccept
+{
+    return ([_storedStorePayments count] > 0);
+}
+
+- (SKPayment*)lastStoredStorePayment
+{
+    return [_storedStorePayments lastObject];
+}
+
+- (void)acceptStoredStorePayment:(SKPayment*)storePayment
+                         success:(void (^)(SKPaymentTransaction *transaction))successBlock
+                         failure:(void (^)(SKPaymentTransaction *transaction, NSError *error))failureBlock
+{
+    BOOL acceptProcessInitilized = NO;
+    
+    for (SKPayment *payment in _storedStorePayments) {
+        //verify the storePayment
+        if ([payment.productIdentifier isEqualToString:storePayment.productIdentifier]) {
+            
+            RMAddPaymentParameters *parameters = [[RMAddPaymentParameters alloc] init];
+            parameters.successBlock = successBlock;
+            parameters.failureBlock = failureBlock;
+            _addPaymentParameters[payment.productIdentifier] = parameters;
+            
+            [self postNotificationWithName:RMStorePaymentRequstWillAddToPaymentQueue payment:payment userInfoExtras:nil];
+            [[SKPaymentQueue defaultQueue] addPayment:payment];
+            
+            [_storedStorePayments removeObject:payment];
+            
+            acceptProcessInitilized = YES;
+            break;
+        }
+    }
+    
+    if (!acceptProcessInitilized) {
+        RMStoreLog(@"unknown stored payment id %@", storePayment.productIdentifier)
+        if (failureBlock != nil)
+        {
+            NSError *error = [NSError errorWithDomain:RMStoreErrorDomain code:RMStoreErrorCodeUnknownProductIdentifier userInfo:@{NSLocalizedDescriptionKey: NSLocalizedStringFromTable(@"Unknown product identifier", @"RMStore", @"Error description")}];
+            failureBlock(nil, error);
+        }
+    }
+}
+
+- (void)rejectStoredStorePayment:(SKPayment*)storePayment
+{
+    for (SKPayment *payment in _storedStorePayments) {
+        if ([payment.productIdentifier isEqualToString:storePayment.productIdentifier]) {
+            [_storedStorePayments removeObject:payment];
+        }
+    }
+}
+
 #pragma mark Receipt
 
 + (NSURL*)receiptURL
@@ -343,6 +401,8 @@ typedef void (^RMStoreSuccessBlock)(void);
     [self addStoreObserver:observer selector:@selector(storeRefreshReceiptFinished:) notificationName:RMSKRefreshReceiptFinished];
     [self addStoreObserver:observer selector:@selector(storeRestoreTransactionsFailed:) notificationName:RMSKRestoreTransactionsFailed];
     [self addStoreObserver:observer selector:@selector(storeRestoreTransactionsFinished:) notificationName:RMSKRestoreTransactionsFinished];
+    [self addStoreObserver:observer selector:@selector(storePaymentRequstWillAddToPaymentQueue:) notificationName:RMStorePaymentRequstWillAddToPaymentQueue];
+    [self addStoreObserver:observer selector:@selector(storePaymentRequstDidStoredToProcessLater:) notificationName:RMStorePaymentRequstDidStoredToProcessLater];
 }
 
 - (void)removeStoreObserver:(id<RMStoreObserver>)observer
@@ -361,6 +421,8 @@ typedef void (^RMStoreSuccessBlock)(void);
     [[NSNotificationCenter defaultCenter] removeObserver:observer name:RMSKRefreshReceiptFinished object:self];
     [[NSNotificationCenter defaultCenter] removeObserver:observer name:RMSKRestoreTransactionsFailed object:self];
     [[NSNotificationCenter defaultCenter] removeObserver:observer name:RMSKRestoreTransactionsFinished object:self];
+    [[NSNotificationCenter defaultCenter] removeObserver:observer name:RMStorePaymentRequstWillAddToPaymentQueue object:self];
+    [[NSNotificationCenter defaultCenter] removeObserver:observer name:RMStorePaymentRequstDidStoredToProcessLater object:self];
 }
 
 // Private
@@ -457,8 +519,10 @@ typedef void (^RMStoreSuccessBlock)(void);
     if (self.storePaymentAcceptor == nil || ![self.storePaymentAcceptor acceptStorePayment:payment fromQueue:queue forProduct:product])
     {
         [_storedStorePayments addObject:payment];
+        [self postNotificationWithName:RMStorePaymentRequstDidStoredToProcessLater payment:payment userInfoExtras:nil];
         return NO;
     } else {
+        [self postNotificationWithName:RMStorePaymentRequstWillAddToPaymentQueue payment:payment userInfoExtras:nil];
         return YES;
     }
 }
@@ -750,6 +814,18 @@ typedef void (^RMStoreSuccessBlock)(void);
     NSString *productIdentifier = transaction.payment.productIdentifier;
     NSMutableDictionary *userInfo = [NSMutableDictionary dictionary];
     userInfo[RMStoreNotificationTransaction] = transaction;
+    userInfo[RMStoreNotificationProductIdentifier] = productIdentifier;
+    if (extras)
+    {
+        [userInfo addEntriesFromDictionary:extras];
+    }
+    [[NSNotificationCenter defaultCenter] postNotificationName:notificationName object:self userInfo:userInfo];
+}
+
+- (void)postNotificationWithName:(NSString*)notificationName payment:(SKPayment*)payment userInfoExtras:(NSDictionary*)extras
+{
+    NSString *productIdentifier = payment.productIdentifier;
+    NSMutableDictionary *userInfo = [NSMutableDictionary dictionary];
     userInfo[RMStoreNotificationProductIdentifier] = productIdentifier;
     if (extras)
     {

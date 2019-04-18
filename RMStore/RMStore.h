@@ -53,10 +53,6 @@ extern NSInteger const RMStoreErrorCodeUnableToCompleteVerification;
  */
 + (BOOL)canMakePayments;
 
-/** Accept store payments that were stored when the `storePaymentAcceptor` wasn't implemented or returned `NO`.
- */
-- (void)acceptStoredStorePayments;
-
 /** Request payment of the product with the given product identifier.
  @param productIdentifier The identifier of the product whose payment will be requested.
  */
@@ -117,6 +113,73 @@ extern NSInteger const RMStoreErrorCodeUnableToCompleteVerification;
 - (void)restoreTransactionsOfUser:(NSString*)userIdentifier
                         onSuccess:(void (^)(NSArray *transactions))successBlock
                           failure:(void (^)(NSError *error))failureBlock __attribute__((availability(ios,introduced=7.0)));
+
+#pragma mark Store payment
+
+/** Accept store payments that were stored when the `storePaymentAcceptor` wasn't implemented or returned `NO`.
+ */
+- (void)acceptStoredStorePayments DEPRECATED_MSG_ATTRIBUTE("see discussion Guideline 3.1.2 - Business - Payments - Subscriptions below");
+
+/**
+ * @discussion Guideline 3.1.2 - Business - Payments - Subscriptions
+ *
+ * When the user initiates an in-app purchase on the App Store, they are taken into your app to continue the transaction. However, the following information must be displayed to the user prior to the purchase:
+ 
+ – Information about the auto-renewable nature of the subscription, including
+ • Title of publication or service
+ • Length of subscription (time period and content or services provided during each subscription period)
+ • Price of subscription, and price per unit if appropriate
+ • Payment will be charged to iTunes Account at confirmation of purchase
+ • Subscription automatically renews unless auto-renew is turned off at least 24-hours before the end of the current period
+ • Account will be charged for renewal within 24-hours prior to the end of the current period, and identify the cost of the renewal
+ • Subscriptions may be managed by the user and auto-renewal may be turned off by going to the user's Account Settings after purchase
+ • Any unused portion of a free trial period, if offered, will be forfeited when the user purchases a subscription to that publication, where applicable
+ ￼– A link to the terms of use
+ ￼– A link to the privacy policy
+ *
+ * according to above requirement, we need to display in app purchase store view before accept the store payment.
+ * So using below methods we can achieve that.
+ *
+ * Steps:-
+ * 1. implement the observer "storePaymentRequstDidStoredToProcessLater:" (to get the notification about store payments are waiting to accept)
+ * 2. get the store payment by "lastStoredStorePayment"
+ * 3. present your in app purchase store for process store payment(you can get product identifier from SKPayment object)
+ * 4. process store payment with the help of "acceptStoredStorePayment: success: failure: "
+ * 5. if already purchase one, then use "rejectStoredStorePayment" to discard the store payment.
+ * 6. do the above steps in loop until "isStoredStorePaymentsAvalibleToAccept" return NO.
+ */
+
+/**
+ Returns whether the store payments are avilable to accept.
+ 
+ @return YES if there any store payments stored. else NO
+ */
+- (BOOL)isStoredStorePaymentsAvalibleToAccept;
+
+/**
+ Returns the last(latest) stored store payment.
+ 
+ @return SKPayment object if avilable, else return nil.
+ */
+- (SKPayment*)lastStoredStorePayment;
+
+/**
+ Accept store payment that was stored when the `storePaymentAcceptor` wasn't implemented or returned `NO`.
+ 
+ @param storePayment SKPayment which is return from "lastStoredStorePayment"
+ @param successBlock The block to be called if the payment is sucessful. Can be `nil`.
+ @param failureBlock The block to be called if the payment fails or there isn't any equal payment with the given storePayment. Can be `nil`.
+ */
+- (void)acceptStoredStorePayment:(SKPayment*)storePayment
+                         success:(void (^)(SKPaymentTransaction *transaction))successBlock
+                         failure:(void (^)(SKPaymentTransaction *transaction, NSError *error))failureBlock;
+
+/**
+ Request to discard the stored store payment.
+ 
+ @param storePayment the store payment need to discard.
+ */
+- (void)rejectStoredStorePayment:(SKPayment*)storePayment;
 
 #pragma mark Receipt
 ///---------------------------------------------
@@ -283,6 +346,9 @@ extern NSInteger const RMStoreErrorCodeUnableToCompleteVerification;
 - (void)storeRefreshReceiptFinished:(NSNotification*)notification __attribute__((availability(ios,introduced=7.0)));
 - (void)storeRestoreTransactionsFailed:(NSNotification*)notification;
 - (void)storeRestoreTransactionsFinished:(NSNotification*)notification;
+
+- (void)storePaymentRequstWillAddToPaymentQueue:(NSNotification*)notification;
+- (void)storePaymentRequstDidStoredToProcessLater:(NSNotification*)notification;
 
 @end
 

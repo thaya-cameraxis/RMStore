@@ -295,11 +295,15 @@ If you provide your own `RMStoreStorePaymentAcceptor` and return `NO` from `acce
 ```
 
 ###Accepintg Stored Payments
-When your app is ready to add the stored store payments to the payment queue, use the `acceptStoredStorePayments` method on RMStore.
+When your app is ready to add the stored store payments to the payment queue, use the `acceptStoredStorePayment:` method on RMStore.
 
 ```objective-c
-[[RMStore defaultStore] acceptStoredStorePayments];
+- (void)acceptStoredStorePayment:(SKPayment*)storePayment
+                         success:(void (^)(SKPaymentTransaction *transaction))successBlock
+                         failure:(void (^)(SKPaymentTransaction *transaction, NSError *error))failureBlock;
 ```
+storePayment SKPayment which is return from "lastStoredStorePayment"
+Call `successBlock` if the payment is successful, `failureBlock` if it isn't. 
 
 ##Requirements
 
